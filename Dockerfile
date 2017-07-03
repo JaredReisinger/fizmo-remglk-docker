@@ -1,5 +1,11 @@
 FROM alpine:latest
 
+LABEL maintainer="jaredreisinger@hotmail.com" \
+    remglk-version="0.2.6" \
+    libfizmo-version="0.7.14" \
+    libglkif-version="0.2.3" \
+    fizmo-remglk-version="0.1.2"
+
 RUN apk add --no-cache ca-certificates
 
 # COPY patches, if needed...
@@ -68,6 +74,12 @@ RUN set -eux; \
 
 COPY play /usr/local/bin/.
 
+VOLUME /usr/local/games
 WORKDIR /usr/local/games
 
-CMD [ "/bin/sh" ]
+# ENTRYPOINT [
+#     "/usr/local/bin/fizmo-remglk",
+#     "-fixmetrics",
+#     "-width", "80",
+#     "-height", "50"
+# ]
