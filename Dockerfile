@@ -8,8 +8,6 @@ LABEL maintainer="jaredreisinger@hotmail.com" \
 
 RUN apk add --no-cache ca-certificates
 
-# COPY patches, if needed...
-
 RUN set -eux; \
     echo "acquire tools..."; \
 	apk add --no-cache --virtual .build-deps \
@@ -17,16 +15,21 @@ RUN set -eux; \
         automake \
         gcc \
         git \
-        libxml2-dev \
         make \
         musl-dev \
 	; \
+    # libxml2-dev is separate, because the shared library needs to stick
+    # around for running fizmo-remglk.
+    apk add --no-cache \
+        libxml2-dev \
+    ; \
     echo "acquire sources..."; \
     mkdir -p /tmp; \
     cd /tmp; \
+    # wget -O libxml2-2.9.4.tar.gz ftp://xmlsoft.org/libxml2/libxml2-2.9.4.tar.gz; \
+    # echo "ffb911191e509b966deb55de705387f14156e1a56b21824357cdf0053233633c *libxml2-2.9.4.tar.gz" | sha256sum -c -; \
+    # tar -xf libxml2-2.9.4.tar.gz; \
     # TODO: use tags/releases to get specific versions?
-    # wget -O libxml.tar.gz ftp://xmlsoft.org/libxml2/libxml2-2.9.4.tar.gz; \
-    # tar -xf libxml.tar.gz; \
     git clone https://github.com/erkyrath/remglk; \
     git clone https://github.com/chrender/libfizmo.git; \
     git clone https://github.com/chrender/libglkif.git; \
@@ -84,10 +87,3 @@ COPY play /usr/local/bin/.
 
 VOLUME /usr/local/games
 WORKDIR /usr/local/games
-
-# ENTRYPOINT [
-#     "/usr/local/bin/fizmo-remglk",
-#     "-fixmetrics",
-#     "-width", "80",
-#     "-height", "50"
-# ]
