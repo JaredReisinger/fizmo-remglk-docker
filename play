@@ -1,0 +1,2 @@
+#!/bin/sh
+fizmo-remglk -fixmetrics -width 255 -height 255 $*
