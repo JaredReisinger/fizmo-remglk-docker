@@ -1,15 +1,28 @@
 FROM alpine:latest
 
+# We can use ENV or ARG to define version variables, but the best-practices
+# doc suggests using ENV for this purpose.
+# https://docs.docker.com/engine/userguide/eng-image/dockerfile_best-practices/#env
+
+ENV REMGLK_TAG="remglk-0.2.6" \
+    LIBFIZMO_TAG="libfizmo_0-7-14" \
+    LIBGLKIF_TAG="libglkif_0-2-3" \
+    FIZMO_REMGLK_TAG="fizmo-remglk_0-1-2"
+
 LABEL maintainer="jaredreisinger@hotmail.com" \
-    remglk.version="0.2.6" \
-    libfizmo.version="0.7.14" \
-    libglkif.version="0.2.3" \
-    fizmo-remglk.version="0.1.2"
+    remglk.tag="${REMGLK_TAG}" \
+    libfizmo.tag="${LIBFIZMO_TAG}" \
+    libglkif.tag="${LIBGLKIF_TAG}" \
+    fizmo-remglk.tag="${FIZMO_REMGLK_TAG}"
+
+COPY *.patch /tmp/patches/
 
 RUN apk add --no-cache ca-certificates
 
 RUN set -eux; \
+    echo "============================================================"; \
     echo "acquire tools..."; \
+    echo "============================================================"; \
 	apk add --no-cache --virtual .build-deps \
         autoconf \
         automake \
@@ -23,50 +36,59 @@ RUN set -eux; \
     apk add --no-cache \
         libxml2-dev \
     ; \
+    echo "============================================================"; \
     echo "acquire sources..."; \
+    echo "============================================================"; \
     mkdir -p /tmp; \
     cd /tmp; \
-    # wget -O libxml2-2.9.4.tar.gz ftp://xmlsoft.org/libxml2/libxml2-2.9.4.tar.gz; \
-    # echo "ffb911191e509b966deb55de705387f14156e1a56b21824357cdf0053233633c *libxml2-2.9.4.tar.gz" | sha256sum -c -; \
-    # tar -xf libxml2-2.9.4.tar.gz; \
-    # TODO: use tags/releases to get specific versions?
-    git clone https://github.com/erkyrath/remglk; \
-    git clone https://github.com/chrender/libfizmo.git; \
-    git clone https://github.com/chrender/libglkif.git; \
-    git clone https://github.com/chrender/fizmo-remglk.git; \
-    # echo "apply patches..."; \
+    git clone --depth 1 --branch "${REMGLK_TAG}" https://github.com/erkyrath/remglk; \
+    git clone --depth 1 --branch "${LIBFIZMO_TAG}" https://github.com/chrender/libfizmo.git; \
+    git clone --depth 1 --branch "${LIBGLKIF_TAG}" https://github.com/chrender/libglkif.git; \
+    git clone --depth 1 --branch "${FIZMO_REMGLK_TAG}" https://github.com/chrender/fizmo-remglk.git; \
+    echo "apply patches..."; \
+    for p in /tmp/patches/*.patch; do \
+        if [ -f "$p" ]; then \
+            base=$(basename "$p" .patch); \
+            dir=$(echo "$base" | sed -e 's/^\(.*\)\.[0-9]*$/\1/'); \
+            cd "$dir"; \
+            patch -p 1 -i "$p"; \
+            cd ..; \
+        fi; \
+    done; \
+    echo "============================================================"; \
     echo "build..."; \
-    # echo "============================================================"; \
-    # echo "libxml2"; \
-    # echo "============================================================"; \
-    # cd /tmp/libxml2-2.9.4; \
-    # ./configure --enable-static --disable-shared --without-zlib --without-lzma; \
-    # make install; \
     echo "============================================================"; \
+    echo "------------------------------------------------------------"; \
     echo "remglk"; \
-    echo "============================================================"; \
+    echo "------------------------------------------------------------"; \
     cd /tmp/remglk; \
     make; \
     cp lib*.a /usr/local/lib/.; \
     mkdir -p /usr/local/include; \
     cp *.h /usr/local/include/.; \
-    echo "============================================================"; \
+    echo "------------------------------------------------------------"; \
     echo "libfizmo"; \
-    echo "============================================================"; \
+    echo "------------------------------------------------------------"; \
     cd /tmp/libfizmo; \
     autoreconf --force --install; \
-    ./configure; \
+    ./configure \
+        --disable-filelist \
+        --disable-command-history \
+        --disable-output-history \
+        --disable-config-files \
+        --disable-prefix-commands \
+        ; \
     make install-dev; \
-    echo "============================================================"; \
+    echo "------------------------------------------------------------"; \
     echo "libglkif"; \
-    echo "============================================================"; \
+    echo "------------------------------------------------------------"; \
     cd /tmp/libglkif; \
     autoreconf --force --install; \
     ./configure; \
     make install-dev; \
-    echo "============================================================"; \
+    echo "------------------------------------------------------------"; \
     echo "fizmo-remglk"; \
-    echo "============================================================"; \
+    echo "------------------------------------------------------------"; \
     cd /tmp/fizmo-remglk; \
     autoreconf --force --install; \
     ./configure; \
@@ -81,6 +103,7 @@ RUN set -eux; \
     rm -rf /tmp/*; \
     echo "set up games directory"; \
     mkdir -p /usr/local/games; \
+    echo "============================================================"; \
     echo "DONE"
 
 COPY play /usr/local/bin/.

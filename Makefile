@@ -1,4 +1,4 @@
-IMAGE_NAME    := fizmo-remglk
+IMAGE_NAME    := jaredreisinger/fizmo-remglk
 IMAGE_VERSION := 0.1
 
 .DEFAULT_GOAL := image
@@ -15,6 +15,7 @@ shell:
 		--rm \
 		--interactive \
 		--tty \
-		--volume "${GAMES_DIR}":/usr/local/games \
 		${IMAGE_NAME}:latest \
 		/bin/sh
+
+	@#	--volume "${GAMES_DIR}":/usr/local/games \
