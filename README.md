@@ -18,7 +18,7 @@ docker run --rm \
     --interactive \
     --tty \
     --volume PATH/TO/GAMES:/usr/local/games \
-    fizmo-remglk:latest play name-of-game.z5
+    jaredreisinger/fizmo-remglk:latest play name-of-game.z5
 ```
 
 The `play` helper script (at `/usr/local/bin/play`) exists purely to make

@@ -1,5 +1,5 @@
 IMAGE_NAME    := jaredreisinger/fizmo-remglk
-IMAGE_VERSION := 0.1
+IMAGE_VERSION := 0.2
 
 .DEFAULT_GOAL := image
 

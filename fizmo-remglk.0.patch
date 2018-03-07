@@ -1,0 +1,175 @@
+diff --git a/src/fizmo-remglk/fizmo-remglk.c b/src/fizmo-remglk/fizmo-remglk.c
+index d419ac4..48da9ae 100644
+--- a/src/fizmo-remglk/fizmo-remglk.c
++++ b/src/fizmo-remglk/fizmo-remglk.c
+@@ -17,7 +17,7 @@
+  * 3. Neither the name of the copyright holder nor the names of its
+  *    contributors may be used to endorse or promote products derived
+  *    from this software without specific prior written permission.
+- * 
++ *
+  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+  * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+  * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+@@ -31,6 +31,7 @@
+  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
++#include <string.h>
+ 
+ #include "glk.h"
+ #include "glk_interface/glk_interface.h"
+@@ -50,19 +51,37 @@ static char *init_err2 = NULL; /*### use this */
+ static strid_t gamefilestream = NULL;
+ static char *gamefilename = NULL;
+ 
++/* We have to jump through some hoops for the game file because of the way glk
++   wants to open the interface, and *then* the game file.  But for the restore
++   file, we can take it all the way to a z_file before we pass it around. */
++static char *restore_filename = NULL;
++//static z_file *restore_stream = NULL;
++
++// static char *savegame_path = NULL;
++static char *autosave_filename = NULL;
++
+ glkunix_argumentlist_t glkunix_arguments[] = {
+-  { "", glkunix_arg_ValueFollows, "filename: The game file to load." },
++  { "", glkunix_arg_ValueFollows,
++        "filename: The game file to load." },
++  { "-restore", glkunix_arg_ValueFollows,
++                "filename: The save file to restore." },
++  // { "-savegame-path", glkunix_arg_ValueFollows,
++  //                     "directory: The directory for save files."},
++  { "-autosave-filename", glkunix_arg_ValueFollows,
++                          "filename: The file for autosave."},
+   { NULL, glkunix_arg_End, NULL }
+ };
+ 
+ 
+ int glkunix_startup_code(glkunix_startup_t *data)
+ {
+-  /* It turns out to be more convenient if we return TRUE from here, even 
++  /* It turns out to be more convenient if we return TRUE from here, even
+      when an error occurs, and display an error in glk_main(). */
+   int ix;
++  int iarg;
+   char *filename = NULL;
+   strid_t gamefile = NULL;
++
+   fizmo_register_filesys_interface(&glkint_filesys_interface);
+ 
+ #ifdef ENABLE_TRACING
+@@ -73,11 +92,27 @@ int glkunix_startup_code(glkunix_startup_t *data)
+      and the library-specific ones stripped out.
+      As usual for Unix, the zeroth argument is the executable name. */
+   for (ix=1; ix<data->argc; ix++) {
+-    if (filename) {
+-      init_err = "You must supply exactly one game file.";
+-      return TRUE;
++    char *arg = data->argv[ix];
++    char *nextArg = ix+1<data->argc ? data->argv[ix+1] : NULL;
++
++    if (!strcmp(arg, "-restore")) {
++      ix++; /* eat an arg */
++      restore_filename = nextArg;
++    // } else if (!strcmp(arg, "-savegame-path")) {
++    //   ix++; /* eat an arg */
++    //   savegame_path = nextArg;
++    //   fprintf(stderr, "*** using savegame_path: %s ***\n", savegame_path);
++    } else if (!strcmp(arg, "-autosave-filename")) {
++      ix++; /* eat an arg */
++      autosave_filename = nextArg;
++      fprintf(stderr, "*** using autosave_filename: %s ***\n", autosave_filename);
++    } else {
++        if (filename) {
++          init_err = "You must supply exactly one game file.";
++          return TRUE;
++        }
++        filename = arg;
+     }
+-    filename = data->argv[ix];
+   }
+ 
+   if (!filename) {
+@@ -104,17 +139,17 @@ int glkunix_startup_code(glkunix_startup_t *data)
+ 
+    This should only be called once, because once you close gamefilestream,
+    you can't get it back. For fizmo-remglk, it will only be called once.
+-   (For other strange platforms, the equivalent interface is more 
++   (For other strange platforms, the equivalent interface is more
+    interesting. But that's not important right now.)
+ */
+ static z_file *glkunix_open_game_stream(z_file *current_stream)
+ {
+   if (!current_stream)
+-    current_stream = zfile_from_glk_strid(gamefilestream, "Game", 
++    current_stream = zfile_from_glk_strid(gamefilestream, "Game",
+       FILETYPE_DATA, FILEACCESS_READ);
+   else
+     zfile_replace_glk_strid(current_stream, gamefilestream);
+-  
++
+   return current_stream;
+ }
+ 
+@@ -127,9 +162,20 @@ void glk_main(void)
+     return;
+   }
+ 
+-  set_configuration_value("savegame-path", NULL);
++  // set_configuration_value("savegame-path", NULL);
+   /*set_configuration_value("transcript-filename", "transcript.txt");*/
+-  set_configuration_value("savegame-default-filename", "");
++  // set_configuration_value("savegame-default-filename", "");
++
++  set_configuration_value("autosave-filename", autosave_filename);
++  // set_configuration_value("savegame-path", savegame_path);
++  // set_configuration_value("savegame-default-filename", "foo.sav");
++  // set_configuration_value("save-text-history-paragraphs", "0");
++
++  /* TODO: verify that disabling save/restore only impact the user-facing UI
++     and not the auto-save, restore-on-start behavior. */
++  // set_configuration_value("disable-save", "true");
++  // set_configuration_value("disable-restore", "true");
++  // set_configuration_value("disable-sound", "true");
+ 
+   fizmo_register_screen_interface(&glkint_screen_interface);
+   fizmo_register_blorb_interface(&glkint_blorb_interface);
+@@ -137,10 +183,35 @@ void glk_main(void)
+   story_stream = glkint_open_interface(&glkunix_open_game_stream);
+   if (!story_stream)
+     return;
+-  fizmo_start(story_stream, NULL, NULL);
++
++
++  /* TODO: we should use and glk_fileref_create_by_name and
++     glk_stream_open_file to mirror auto-save name! */
++  // or just glkint_openfile...
++  z_file *restore_stream = NULL;
++
++  if (restore_filename) {
++    // restore_stream = glkint_filesys_interface.openfile(restore_filename, FILETYPE_SAVEGAME, FILEACCESS_READ);
++
++    strid_t str = glkunix_stream_open_pathname(restore_filename, FALSE, 2);
++    restore_stream = zfile_from_glk_strid(str, "Autosave", FILETYPE_DATA, FILEACCESS_READ);
++    // frefid_t fileref = glk_fileref_create_by_name();
++    // strid_t str = glkunix_stream_open_pathname(nextArg, FALSE, 2);
++    // if (!str) {
++
++    // if (!restore_stream) {
++    //   init_err = "The restore file could not be opened.";
++    //   init_err2 = nextArg;
++    //   return TRUE;
++    // }
++
++    // restore_stream = zfile_from_glk_strid(str, "Restore", FILETYPE_SAVEGAME,
++    //                                       FILEACCESS_READ);
++  }
++
++  fizmo_start(story_stream, NULL, restore_stream);
+ 
+ #ifdef ENABLE_TRACING
+   turn_off_trace();
+ #endif // ENABLE_TRACING
+ }
+-

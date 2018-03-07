@@ -5,9 +5,9 @@ FROM alpine:latest
 # https://docs.docker.com/engine/userguide/eng-image/dockerfile_best-practices/#env
 
 ENV REMGLK_TAG="remglk-0.2.6" \
-    LIBFIZMO_TAG="libfizmo_0-7-14" \
-    LIBGLKIF_TAG="libglkif_0-2-3" \
-    FIZMO_REMGLK_TAG="fizmo-remglk_0-1-2"
+    LIBFIZMO_TAG="libfizmo_0-7-15" \
+    LIBGLKIF_TAG="libglkif_0-2-4" \
+    FIZMO_REMGLK_TAG="fizmo-remglk_0-1-3"
 
 LABEL maintainer="jaredreisinger@hotmail.com" \
     remglk.tag="${REMGLK_TAG}" \
@@ -41,7 +41,7 @@ RUN set -eux; \
     echo "============================================================"; \
     mkdir -p /tmp; \
     cd /tmp; \
-    git clone --depth 1 --branch "${REMGLK_TAG}" https://github.com/erkyrath/remglk; \
+    git clone --depth 1 --branch "${REMGLK_TAG}" https://github.com/erkyrath/remglk.git; \
     git clone --depth 1 --branch "${LIBFIZMO_TAG}" https://github.com/chrender/libfizmo.git; \
     git clone --depth 1 --branch "${LIBGLKIF_TAG}" https://github.com/chrender/libglkif.git; \
     git clone --depth 1 --branch "${FIZMO_REMGLK_TAG}" https://github.com/chrender/fizmo-remglk.git; \
@@ -91,8 +91,7 @@ RUN set -eux; \
     echo "------------------------------------------------------------"; \
     cd /tmp/fizmo-remglk; \
     autoreconf --force --install; \
-    ./configure; \
-    # ./configure LDFLAGS=-static; \
+    ./configure LIBS=-lremglk; \
     make install; \
     echo "============================================================"; \
     echo "cleanup"; \
